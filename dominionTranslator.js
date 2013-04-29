@@ -1,4 +1,4 @@
-// javascript:(function(){_dtLang='ja';var s=document.createElement('script');s.src='https://some/dominionTranslator.js';document.head.appendChild(s);s.parentNode.removeChild(s);}());
+// javascript:(function(){_dtLang='ja';var s=document.createElement('script');s.src='http://atty303.github.io/DominionTranslator/src/dominionTranslator.js';document.head.appendChild(s);s.parentNode.removeChild(s);}());
 
 (function ($) {
     "use strict";
@@ -11,7 +11,7 @@
         // Load message catalog (JSONP)
         window._dominionTranslatorCallback = onMessageCatalogLoaded;
         script = document.createElement('script');
-        script.src = 'https://some/messageCatalog.' + lang + '.js';
+        script.src = 'http://atty303.github.io/DominionTranslator/src/messageCatalog.' + lang + '.js';
         document.head.appendChild(script);
         script.parentNode.removeChild(script);
     };
