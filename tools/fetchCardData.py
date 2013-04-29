@@ -3,36 +3,37 @@ import json
 import collections
 
 
-class ChromeMessageCatalog(object):
-    def __init__(self):
-        self.catalog = collections.OrderedDict()
-
-    def add(self, id, message):
-        self.catalog[id] = {'message': message}
-
-    def dumps(self, *args, **kwargs):
-        return json.dumps(self.catalog, *args, **kwargs)
-
-
-def dumpCardTypes(dataObj):
-    catalog = ChromeMessageCatalog()
+def transformCardTypes(dataObj):
+    cardTypes = {}
 
     for cardType, typeObj in dataObj['cardTypes'].items():
-        catalog.add(cardType, typeObj['0'][0])
+        cardTypes[cardType] = typeObj['0']
 
-    return catalog
+    return cardTypes
 
 
-def dumpCards(dataObj):
-    catalog = ChromeMessageCatalog()
+def transformCards(dataObj):
+    cards = []
 
     for cardObj in dataObj['cards']:
         id = cardObj['nameId']
         name = cardObj['name']['0']
         text = cardObj['text']['0']
 
-        catalog.add(id + '.name', name)
-        catalog.add(id + '.text', text)
+        d = collections.OrderedDict()
+        d['nameId'] = id
+        d['name'] = name
+        d['text'] = text
+        cards.append(d)
+
+    return cards
+
+
+def createMessageCatalog(dataObj):
+    catalog = collections.OrderedDict()
+
+    catalog['cardTypes'] = transformCardTypes(dataObj)
+    catalog['cards'] = transformCards(dataObj)
 
     return catalog
 
@@ -42,9 +43,11 @@ def main():
     jsonStr = data.replace('FS.Dominion.CardBuilder.Data = ', '').replace('};', '}')
     dataObj = json.loads(jsonStr)
 
-    file('cardTypes.json', 'w').write(dumpCardTypes(dataObj).dumps())
+    messageCatalog = createMessageCatalog(dataObj)
+    catalogJson = json.dumps(messageCatalog, indent=4)
 
-    file('cards.json', 'w').write(dumpCards(dataObj).dumps())
+    file('../messageCatalog.en.js', 'w').write('_dominionTranslatorCallback(%s);' % catalogJson)
+
 
 if __name__ == '__main__':
     main()
