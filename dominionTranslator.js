@@ -3,25 +3,39 @@
 (function ($) {
     "use strict";
 
-    var lang = window._dtLang || 'ja';
+    var Global = {
+        language: window._dtLang || 'ja'
+    };
 
     /**
      * メイン処理: Bookmarklet がロードされた時に実行される。
      */
     var main = function () {
-        var script;
-
         if (!(window.location.host === 'play.goko.com' && window.location.pathname.indexOf('/Dominion/gameClient.html') === 0)) {
             NotificationWidget.error('<a href="http://play.goko.com/Dominion/gameClient.html" target="_blank">Dominion Online</a> を開いてからブックマークレットを実行してください。');
             return;
         }
 
-        // JSONP で翻訳カタログをロードする
+        if (document.readyState !== 'complete') {
+            $(document).on('readystatechange', function () {
+                if (document.readyState === 'complete') {
+                    loadMessageCatalog(Global.language);
+                }
+            });
+        } else {
+            loadMessageCatalog(Global.language);
+        }
+    };
+
+    /**
+     * JSONP で翻訳カタログをロードする。
+     */
+    var loadMessageCatalog = function (lang) {
         window._dominionTranslatorCallback = onMessageCatalogLoaded;
-        script = document.createElement('script');
-        script.src = 'http://atty303.github.io/DominionTranslator/src/messageCatalog.' + lang + '.js';
-        document.head.appendChild(script);
-        script.parentNode.removeChild(script);
+        $('<script/>')
+            .attr('src', 'http://atty303.github.io/DominionTranslator/src/messageCatalog.' + lang + '.js')
+            .appendTo($('head'))
+            .remove();
     };
 
     /**
@@ -35,7 +49,7 @@
         try {
             injectMessagesToCardBuilder(messageCatalog);
 
-            if (lang === 'ja') {
+            if (Global.language === 'ja') {
                 injectCardHelperAdvice();
             }
         } catch (e) {
