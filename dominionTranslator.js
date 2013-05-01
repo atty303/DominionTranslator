@@ -1,4 +1,4 @@
-// javascript:(function(){var s=document.createElement('script');s.src='http://atty303.github.io/DominionTranslator/src/dominionTranslator.js';document.head.appendChild(s);s.parentNode.removeChild(s);}());
+// javascript:(function(){var s=document.createElement('script');s.src='https://s3-ap-northeast-1.amazonaws.com/dominion-translator/master/dominionTranslator.js';document.head.appendChild(s);s.parentNode.removeChild(s);}());
 
 (function ($) {
     "use strict";
@@ -33,7 +33,7 @@
     var loadMessageCatalog = function (lang) {
         window._dominionTranslatorCallback = onMessageCatalogLoaded;
         $('<script/>')
-            .attr('src', 'http://atty303.github.io/DominionTranslator/src/messageCatalog.' + lang + '.js')
+            .attr('src', 'https://s3-ap-northeast-1.amazonaws.com/dominion-translator/master/messageCatalog.' + lang + '.js')
             .appendTo($('head'))
             .remove();
     };
