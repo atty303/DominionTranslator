@@ -98,19 +98,21 @@
 
             if (bHalfSize) {
                 if (res.bCardTypeTwoLines)
-                    res.cardTypeFontSize = 19;
-                else if (res.cardTypeLen >= 12/*20*/)
                     res.cardTypeFontSize = 17;
-                else if (res.cardTypeLen > 8/*16*/)
+                else if (res.cardTypeLen >= 17)
+                    res.cardTypeFontSize = 15;
+                else if (res.cardTypeLen >= 13)
+                    res.cardTypeFontSize = 17;
+                else if (res.cardTypeLen >= 12)
                     res.cardTypeFontSize = 20;
                 else
                     res.cardTypeFontSize = 22;
             } else {
                 if (res.bCardTypeTwoLines)
                     res.cardTypeFontSize = 17;
-                else if (res.cardTypeLen >= 14/*20*/)
+                else if (res.cardTypeLen >= 14)
                     res.cardTypeFontSize = 17;
-                else if (res.cardTypeLen >= 12/*16*/)
+                else if (res.cardTypeLen >= 12)
                     res.cardTypeFontSize = 20;
                 else
                     res.cardTypeFontSize = 24;
@@ -446,6 +448,7 @@
             if (this.isAssetsLoaded) {
                 this._appendCard({ card: cardId });
                 //this._appendCard({ card: cardId, width: 170, height: 256 });
+                //this._appendCard({ card: cardId, displayMode: 'HALFIMAGE' });
             }
         };
 
