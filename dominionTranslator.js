@@ -46,13 +46,19 @@
      * @param messageCatalog 翻訳カタログ
      */
     var onMessageCatalogLoaded = function (messageCatalog) {
+        // ゲームクライアントにおけるカード描画を管理するクラス。グローバルスコープから参照可能である。
+        var CardBuilder = FS.Dominion.CardBuilder;
+
+        var textCompiler = new CardTextCompiler();
+
         try {
-            injectMessagesToCardBuilder(messageCatalog);
+            injectMessagesToCardBuilder(messageCatalog, textCompiler, CardBuilder);
 
             if (Global.language === 'ja') {
-                injectCardHelperAdvice();
+                injectCardHelperAdvice(CardBuilder);
             }
         } catch (e) {
+            // ゲームクライアントのバージョンアップにより、クラス構造が変わって注入に失敗する可能性がある。
             NotificationWidget.error('日本語化に失敗しました。');
             throw e;
         }
@@ -60,7 +66,7 @@
         NotificationWidget.info('日本語化に成功しました。');
 
         window.openCardEditor = function () {
-            var editor = new CardEditor(messageCatalog);
+            var editor = new CardEditor(messageCatalog, textCompiler, CardBuilder);
             editor.open();
         };
     };
@@ -73,16 +79,33 @@
         return null;
     };
 
+    /**
+     * カードの描画結果キャッシュをクリアする。
+     *
+     * CardBuilder.clearAllCardCache() というメソッドが用意されているが、それはカードの元画像キャッシュもクリアしてしまうので、
+     * そちらから描画結果キャッシュをクリアする部分のみを抜き出した。
+     *
+     * @param cardBuilder CardBuilder クラスのインスタンス
+     */
     var clearCardRenderCache = function (cardBuilder) {
         cardBuilder._cardImageCache = {};
         cardBuilder.lruListHead = null;
         cardBuilder.lruListSize = 0;
     };
 
-    var injectMessagesToCardBuilder = function (messagesCatalog) {
-        var cardTypes = FS.Dominion.CardBuilder.Data.cardTypes,
-            cards = FS.Dominion.CardBuilder.Data.cards,
-            cardBuilder = FS.Dominion.CardBuilder.getInstance(),
+    /**
+     * ゲームクライアントのカードデータに翻訳カタログを注入する。
+     *
+     * - 言語コード 0 (英語) のメッセージを上書きする。
+     * - 翻訳注入前のカード描画結果がキャッシュに残っている可能性があるので、キャッシュをクリアする。
+     *
+     * @param messagesCatalog 翻訳カタログ
+     * @param CardBuilder CardBuilder クラス
+     */
+    var injectMessagesToCardBuilder = function (messagesCatalog, textCompiler, CardBuilder) {
+        var cardTypes = CardBuilder.Data.cardTypes,
+            cards = CardBuilder.Data.cards,
+            cardBuilder = CardBuilder.getInstance(),
             key, i;
 
         for (key in messagesCatalog.cardTypes) {
@@ -95,15 +118,22 @@
 
             if (cardObj !== null) {
                 cardObj.name['0'] = cardMessage.name;
-                cardObj.text['0'] = compileCardText(cardMessage.text);
+                cardObj.text['0'] = textCompiler.compile(cardMessage.text);
             }
         }
 
         clearCardRenderCache(cardBuilder);
     };
 
-    var injectCardHelperAdvice = function () {
-        var CardHelper = FS.Dominion.CardBuilder.CardHelper,
+    /**
+     * ゲームクライアントの描画コードにパッチを当てる。
+     *
+     * - カード種別のフォントサイズを日本語にあわせて調整する。
+     *
+     * @param CardBuilder CardBuilder クラス
+     */
+    var injectCardHelperAdvice = function (CardBuilder) {
+        var CardHelper = CardBuilder.CardHelper,
             _unifyCardData = CardHelper._unifyCardData;
 
         CardHelper._unifyCardData = function () {
@@ -136,23 +166,49 @@
         };
     };
 
-    var compileCardText = (function () {
-        var normalizeChars = {
-            from: '０１２３４５６７８９＋、。「」',
-            to: '0123456789+､｡｢｣'
+    /**
+     * 日本語カードテキストの書式設定を楽にするためのテキストコンパイラクラス
+     */
+    var CardTextCompiler = (function () {
+        /**
+         * @constructor
+         */
+        var CardTextCompiler = function () {
+            this._initNormalizeChars();
         };
 
-        var normalizeCharsRe = [];
-        for (var i = 0; i < normalizeChars.from.length; ++i) {
-            normalizeCharsRe.push(new RegExp(normalizeChars.from[i], 'g'));
-        }
+        CardTextCompiler.prototype.compile = function (source) {
+            var lines;
 
-        var normalizeText = function (s) {
+            if (typeof source === 'string') {
+                return source;
+            }
+
+            lines = this.parseSourceText(source);
+            lines = this.adjustLineSpacing(lines);
+
+            return this.buildCompiledText(lines);
+        };
+
+        CardTextCompiler.prototype._initNormalizeChars = function () {
+            var i;
+
+            this.normalizeChars = {
+                from: '０１２３４５６７８９＋、。「」',
+                to: '0123456789+､｡｢｣'
+            };
+            this.normalizeCharsRe = [];
+            for (i = 0; i < this.normalizeChars.from.length; ++i) {
+                this.normalizeCharsRe.push(new RegExp(this.normalizeChars.from[i], 'g'));
+            }
+        };
+
+        CardTextCompiler.prototype.normalizeText = function (s) {
             var i, from, to;
 
-            for (i = 0; i < normalizeCharsRe.length; ++i) {
-                from = normalizeCharsRe[i];
-                to = normalizeChars.to[i];
+            for (i = 0; i < this.normalizeCharsRe.length; ++i) {
+                from = this.normalizeCharsRe[i];
+                to = this.normalizeChars.to[i];
 
                 s = s.replace(from, to);
             }
@@ -163,7 +219,7 @@
             return s;
         };
 
-        var parseSourceText = function (source) {
+        CardTextCompiler.prototype.parseSourceText = function (source) {
             var lines = [],
                 i, line, tokens, command, text, m, isSmall = false;
 
@@ -183,7 +239,7 @@
 
                 line = {
                     isPadding: false,
-                    plainText: normalizeText(text),
+                    plainText: this.normalizeText(text),
                     fontSize: 20,
                     height: 24,
                     fixedHeight: 0,
@@ -240,17 +296,7 @@
             return lines;
         };
 
-        var eachLine = function (lines, callback) {
-            var i, prev, next;
-
-            for (i = 0; i < lines.length; ++i) {
-                prev = (i - 1 >= 0 ? lines[i - 1] : null);
-                next = (i + 1 < lines.length ? lines[i + 1] : null);
-                callback(lines[i], prev, next);
-            }
-        };
-
-        var adjustLineSpacing = function (lines) {
+        CardTextCompiler.prototype.adjustLineSpacing = function (lines) {
             var i, line, diff, margin, paddedLines;
 
             for (i = 0; i < lines.length; ++i) {
@@ -275,7 +321,8 @@
             }
 
             paddedLines = [];
-            eachLine(lines, function (line, prev, next) {
+            for (i = 0; i < lines.length; ++i) {
+                line = lines[i];
                 if (line.marginTop > 0) {
                     paddedLines.push({ isPadding: true, _height: line.marginTop })
                 }
@@ -285,12 +332,12 @@
                 if (line.marginBottom > 0) {
                     paddedLines.push({ isPadding: true, _height: line.marginBottom })
                 }
-            });
+            }
 
             return paddedLines;
         };
 
-        var buildCompiledText = function (lines) {
+        CardTextCompiler.prototype.buildCompiledText = function (lines) {
             var fontSize = 24,
                 height = 10,
                 isBold = false,
@@ -332,18 +379,7 @@
             return compiledText;
         };
 
-        var compile = function (source) {
-            var lines;
-
-            lines = parseSourceText(source);
-            lines = adjustLineSpacing(lines);
-
-            return buildCompiledText(lines);
-        };
-
-        return function (source) {
-            return typeof source === 'string' ? source : compile(source);
-        };
+        return CardTextCompiler;
     }());
 
     /**
@@ -351,19 +387,18 @@
      */
     var CardEditor = (function () {
         /**
-         * コンストラクタ
-         *
          * @param messageCatalog 編集対象とする翻訳カタログ
          * @constructor
          */
-        var CardEditor = function (messageCatalog) {
+        var CardEditor = function (messageCatalog, textCompiler, CardBuilder) {
             var self = this, cardIds;
 
             this.isAssetsLoaded = false;
             this.messageCatalog = messageCatalog;
+            this.textCompiler = textCompiler;
 
-            this.cards = FS.Dominion.CardBuilder.Data.cards;
-            this.cardBuilder = FS.Dominion.CardBuilder.getInstance();
+            this.cards = CardBuilder.Data.cards;
+            this.cardBuilder = CardBuilder.getInstance();
 
             this.$el = this._createTemplate();
             this.$cardId = $('#ceId', this.$el);
@@ -457,7 +492,7 @@
                 cardMessage = findCardObject(this.messageCatalog.cards, cardId);
 
             cardData.name['0'] = cardMessage.name;
-            cardData.text['0'] = compileCardText(cardMessage.text);
+            cardData.text['0'] = this.textCompiler.compile(cardMessage.text);
 
             if (this.isAssetsLoaded) {
                 this._appendCard({ card: cardId });
