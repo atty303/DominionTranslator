@@ -5,10 +5,18 @@
 
     var lang = window._dtLang || 'ja';
 
+    /**
+     * メイン処理: Bookmarklet がロードされた時に実行される。
+     */
     var main = function () {
         var script;
 
-        // Load message catalog (JSONP)
+        if (!(window.location.host === 'play.goko.com' && window.location.pathname.indexOf('/Dominion/gameClient.html') === 0)) {
+            NotificationWidget.error('<a href="http://play.goko.com/Dominion/gameClient.html" target="_blank">Dominion Online</a> を開いてからブックマークレットを実行してください。');
+            return;
+        }
+
+        // JSONP で翻訳カタログをロードする
         window._dominionTranslatorCallback = onMessageCatalogLoaded;
         script = document.createElement('script');
         script.src = 'http://atty303.github.io/DominionTranslator/src/messageCatalog.' + lang + '.js';
@@ -16,11 +24,26 @@
         script.parentNode.removeChild(script);
     };
 
+    /**
+     * JSONP による翻訳カタログのロードが完了した時に呼ばれるコールバック
+     *
+     * ゲームクライアントへの翻訳メッセージの注入を行う。
+     *
+     * @param messageCatalog 翻訳カタログ
+     */
     var onMessageCatalogLoaded = function (messageCatalog) {
-        injectMessagesToCardBuilder(messageCatalog);
-        if (lang === 'ja') {
-            injectCardHelperAdvice();
+        try {
+            injectMessagesToCardBuilder(messageCatalog);
+
+            if (lang === 'ja') {
+                injectCardHelperAdvice();
+            }
+        } catch (e) {
+            NotificationWidget.error('日本語化に失敗しました。');
+            throw e;
         }
+
+        NotificationWidget.info('日本語化に成功しました。');
 
         window.openCardEditor = function () {
             var editor = new CardEditor(messageCatalog);
@@ -549,5 +572,91 @@
         return CardEditor;
     }());
 
+    /**
+     * 通知ウィジェットクラス
+     *
+     * jQuery のロードされていないページで実行される可能性があるため、jQuery は利用していない。
+     */
+    var NotificationWidget = (function () {
+        var NotificationWidget = function (spec) {
+            spec = {
+                severity: spec.severity || 'info',
+                message: spec.message || '',
+                timeout: spec.timeout || 3000
+            };
+
+            this.el = this._createTemplate();
+
+            this.setSeverity(spec.severity);
+            this.setMessage(spec.message);
+            this.setTimeout(spec.timeout);
+        };
+
+        NotificationWidget.info = function (message, timeout) {
+            var widget = new NotificationWidget({ severity: 'info', message: message, timeout: timeout });
+            return widget.show();
+        };
+
+        NotificationWidget.error = function (message, timeout) {
+            var widget = new NotificationWidget({ severity: 'error', message: message, timeout: timeout });
+            return widget.show();
+        };
+
+        NotificationWidget.prototype.setSeverity = function (severity) {
+            if (severity === 'info') {
+                this.el.style.borderTopColor = 'green';
+            } else if (severity === 'error' ) {
+                this.el.style.borderTopColor = 'red';
+            } else {
+                this.el.style.borderTopColor = 'white';
+            }
+        };
+
+        NotificationWidget.prototype.setMessage = function (message) {
+            this.el.innerHTML = message;
+        };
+
+        NotificationWidget.prototype.setTimeout = function (msecs) {
+            this.timeout = msecs;
+        };
+
+        NotificationWidget.prototype.show = function () {
+            var self = this;
+
+            document.body.appendChild(this.el);
+
+            if (this.timeout > 0) {
+                setTimeout(function () { self.hide(); }, this.timeout);
+            }
+
+            return this;
+        };
+
+        NotificationWidget.prototype.hide = function () {
+            if (this.el.parentNode) {
+                this.el.parentNode.removeChild(this.el);
+            }
+        };
+
+        NotificationWidget.prototype._createTemplate = function () {
+            var html = [
+                '<div style="position: fixed; top: 0; left: 0; width: 100%; height: 20px; z-index: 99999; padding: 20px; opacity: 0.95; border-top: 5px solid white;',
+                '  text-align: center; font: sans-serif 20px normal; background: white; color: black;',
+                '  -moz-box-sizing: content-box; -webkit-box-sizing: content-box; box-sizing: content-box;',
+                '  -moz-box-shadow: 0 5px 10px 2px rgba(0, 0, 0, 0.8); -webkit-box-shadow: 0 5px 10px 2px rgba(0, 0, 0, 0.8); box-shadow: 0 5px 10px 2px rgba(0, 0, 0, 0.8);">',
+                '</div>'
+            ].join('\n');
+
+            var div = document.createElement('div');
+            div.innerHTML = html;
+            return div.childNodes[0];
+        };
+
+        return NotificationWidget;
+    }());
+
+    // ================================================================
+
     main();
-}(jQuery));
+
+}(window.jQuery));
