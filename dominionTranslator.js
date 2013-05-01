@@ -11,12 +11,18 @@
      * メイン処理: Bookmarklet がロードされた時に実行される。
      */
     var main = function () {
+        setupAnalytics();
+
         if (!(window.location.host === 'play.goko.com' && window.location.pathname.indexOf('/Dominion/gameClient.html') === 0)) {
+            gaTrackEvent('Launch', 'Block');
             NotificationWidget.error('<a href="http://play.goko.com/Dominion/gameClient.html" target="_blank">Dominion Online</a> を開いてからブックマークレットを実行してください。');
             return;
         }
 
+        _gaq.push(['_trackPageview']);
+
         if (document.readyState !== 'complete') {
+            gaTrackEvent('Launch', 'WaitReady');
             $(document).on('readystatechange', function () {
                 if (document.readyState === 'complete') {
                     loadMessageCatalog(Global.language);
@@ -28,9 +34,32 @@
     };
 
     /**
+     * Google Analytics をセットアップする。
+     *
+     * 元ページが Analytics をロードしていない場合のみライブラリをロードする。
+     */
+    var setupAnalytics = function () {
+        window._gaq = window._gaq || [];
+        if (toString.call(_gaq) === '[object Array]') {
+            (function() {
+                var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+                ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+                var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+            }());
+        }
+
+        _gaq.push(['_dt._setAccount', 'UA-38373811-3']);
+    };
+
+    var gaTrackEvent = function (category, action, label, value, nonInteraction) {
+        _gaq.push(['_dt._trackEvent', category, action, label, value, nonInteraction]);
+    };
+
+    /**
      * JSONP で翻訳カタログをロードする。
      */
     var loadMessageCatalog = function (lang) {
+        gaTrackEvent('Launch', 'BeginLoad');
         window._dominionTranslatorCallback = onMessageCatalogLoaded;
         $('<script/>')
             .attr('src', 'https://s3-ap-northeast-1.amazonaws.com/dominion-translator/master/messageCatalog.' + lang + '.js')
@@ -49,6 +78,8 @@
         // ゲームクライアントにおけるカード描画を管理するクラス。グローバルスコープから参照可能である。
         var CardBuilder = FS.Dominion.CardBuilder;
 
+        gaTrackEvent('Launch', 'LoadComplete');
+
         var textCompiler = new CardTextCompiler();
 
         try {
@@ -59,13 +90,16 @@
             }
         } catch (e) {
             // ゲームクライアントのバージョンアップにより、クラス構造が変わって注入に失敗する可能性がある。
+            gaTrackEvent('Launch', 'Fail', '' + e);
             NotificationWidget.error('日本語化に失敗しました。');
             throw e;
         }
 
+        gaTrackEvent('Launch', 'Success');
         NotificationWidget.info('日本語化に成功しました。');
 
         window.openCardEditor = function () {
+            gaTrackEvent('CardEditor', 'Open');
             var editor = new CardEditor(messageCatalog, textCompiler, CardBuilder);
             editor.open();
         };
