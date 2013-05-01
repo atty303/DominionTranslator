@@ -1,4 +1,4 @@
-// javascript:(function(){_dtLang='ja';var s=document.createElement('script');s.src='http://atty303.github.io/DominionTranslator/src/dominionTranslator.js';document.head.appendChild(s);s.parentNode.removeChild(s);}());
+// javascript:(function(){var s=document.createElement('script');s.src='http://atty303.github.io/DominionTranslator/src/dominionTranslator.js';document.head.appendChild(s);s.parentNode.removeChild(s);}());
 
 (function ($) {
     "use strict";
@@ -173,11 +173,7 @@
                 }
 
                 if (command.indexOf('-') >= 0) {
-                    /*
-                    line.plainText = '/l';
-                    line.height = line.fixedHeight = 22;
-                    */
-                    line.plainText = '/t1/h-4----------------------------------------------------------------------------------------------------/t0/h-2';
+                    line.plainText = '/h00────────────────────/h-2';
                     line.fontSize = 18;
                     line.height = 12;
                 }
